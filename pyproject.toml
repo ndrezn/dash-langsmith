@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=42", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "dash-langsmith"
+version = "0.1.0"
+description = "Automatic LangSmith tracing for Dash MCP tool calls"
+requires-python = ">=3.9"
+dependencies = [
+    "dash>=3.0.0",
+    "langsmith>=0.1.0",
+]
+
+[project.entry-points."dash_hooks"]
+dash_langsmith = "dash_langsmith"
+
+[tool.setuptools]
+packages = ["dash_langsmith"]
