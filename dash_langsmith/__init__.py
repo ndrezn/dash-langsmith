@@ -33,6 +33,7 @@ def _install_mcp_tracing(app):
         app.server.wsgi_app,
         mcp_path=mcp_path,
         project_name=project_name,
+        # environment is read from LANGSMITH_ENVIRONMENT inside the middleware
     )
 
 

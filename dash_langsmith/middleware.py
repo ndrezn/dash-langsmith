@@ -26,11 +26,29 @@ with the client info.
 
 import io
 import json
+import os
 import uuid
 from datetime import datetime, timezone
 from typing import Optional
 
 import langsmith
+
+
+def _parent_run_id_from_environ(environ: dict) -> Optional[str]:
+    """Extract a parent run ID from LangSmith distributed trace headers."""
+    headers = {
+        key[5:].replace("_", "-").title(): value
+        for key, value in environ.items()
+        if key.startswith("HTTP_")
+    }
+    try:
+        from langsmith import run_trees
+        parent = run_trees.RunTree.from_headers(headers)
+        if parent is not None:
+            return str(parent.id)
+    except Exception:
+        pass
+    return None
 
 
 class LangSmithMCPMiddleware:
@@ -51,10 +69,12 @@ class LangSmithMCPMiddleware:
         app,
         mcp_path: str = "/_mcp",
         project_name: Optional[str] = None,
+        environment: Optional[str] = None,
     ):
         self.app = app
         self.mcp_path = mcp_path
         self.project_name = project_name
+        self.environment = environment or os.environ.get("LANGSMITH_ENVIRONMENT")
         self.client = langsmith.Client()
         # session_id -> {"client_name": str, "client_version": str}
         self._sessions: dict[str, dict] = {}
@@ -107,8 +127,12 @@ class LangSmithMCPMiddleware:
         arguments = params.get("arguments", {})
         meta = params.get("_meta", {})
 
-        # Link to a parent LangSmith run if the agent provided one.
-        parent_run_id: Optional[str] = meta.get("langsmith_run_id")
+        # Prefer the standard LangSmith trace headers injected by the calling agent;
+        # fall back to the legacy _meta.langsmith_run_id field for backwards compat.
+        parent_run_id: Optional[str] = (
+            meta.get("langsmith_run_id")
+            or _parent_run_id_from_environ(environ)
+        )
 
         # Tag with the MCP client identity captured at initialize.
         session_id = self._session_id(environ)
@@ -117,9 +141,12 @@ class LangSmithMCPMiddleware:
         if session.get("client_name"):
             tags.append(f"mcp-client:{session['client_name']}")
 
-        extra = {"metadata": {"mcp_session_id": session_id, **session}}
+        metadata: dict = {"mcp_session_id": session_id, **session}
         if meta:
-            extra["metadata"]["mcp_meta"] = meta
+            metadata["mcp_meta"] = meta
+        if self.environment:
+            metadata["environment"] = self.environment
+        extra = {"metadata": metadata}
 
         run_id = str(uuid.uuid4())
         start_time = datetime.now(timezone.utc)
