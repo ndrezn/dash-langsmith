@@ -123,18 +123,23 @@ class LangSmithMCPMiddleware:
 
         run_id = str(uuid.uuid4())
         start_time = datetime.now(timezone.utc)
+        run_created = False
 
-        self.client.create_run(
-            id=run_id,
-            name=tool_name,
-            run_type="tool",
-            inputs={"arguments": arguments},
-            project_name=self.project_name,
-            parent_run_id=parent_run_id,
-            start_time=start_time,
-            tags=tags,
-            extra=extra,
-        )
+        try:
+            self.client.create_run(
+                id=run_id,
+                name=tool_name,
+                run_type="tool",
+                inputs={"arguments": arguments},
+                project_name=self.project_name,
+                parent_run_id=parent_run_id,
+                start_time=start_time,
+                tags=tags,
+                extra=extra,
+            )
+            run_created = True
+        except Exception:
+            pass
 
         response_chunks = []
         response_meta: dict = {}
@@ -149,11 +154,15 @@ class LangSmithMCPMiddleware:
             for chunk in iterable:
                 response_chunks.append(chunk)
         except Exception as exc:
-            self.client.update_run(
-                run_id,
-                error=str(exc),
-                end_time=datetime.now(timezone.utc),
-            )
+            if run_created:
+                try:
+                    self.client.update_run(
+                        run_id,
+                        error=str(exc),
+                        end_time=datetime.now(timezone.utc),
+                    )
+                except Exception:
+                    pass
             raise
         finally:
             if hasattr(iterable, "close"):
@@ -174,12 +183,16 @@ class LangSmithMCPMiddleware:
         except (json.JSONDecodeError, UnicodeDecodeError):
             outputs = {"raw": full_body.decode("utf-8", errors="replace")}
 
-        self.client.update_run(
-            run_id,
-            outputs=outputs,
-            error=error,
-            end_time=end_time,
-        )
+        if run_created:
+            try:
+                self.client.update_run(
+                    run_id,
+                    outputs=outputs,
+                    error=error,
+                    end_time=end_time,
+                )
+            except Exception:
+                pass
 
         return [full_body]
 
