@@ -130,8 +130,8 @@ class LangSmithMCPMiddleware:
         # Prefer the standard LangSmith trace headers injected by the calling agent;
         # fall back to the legacy _meta.langsmith_run_id field for backwards compat.
         parent_run_id: Optional[str] = (
-            meta.get("langsmith_run_id")
-            or _parent_run_id_from_environ(environ)
+            _parent_run_id_from_environ(environ)
+            or meta.get("langsmith_run_id")
         )
 
         # Tag with the MCP client identity captured at initialize.
