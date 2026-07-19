@@ -138,8 +138,8 @@ class LangSmithMCPMiddleware:
                 extra=extra,
             )
             run_created = True
-        except Exception:
-            pass
+        except Exception as exc:
+            self._warn(environ, f"create_run failed, tracing disabled for this call: {exc}")
 
         response_chunks = []
         response_meta: dict = {}
@@ -161,8 +161,8 @@ class LangSmithMCPMiddleware:
                         error=str(exc),
                         end_time=datetime.now(timezone.utc),
                     )
-                except Exception:
-                    pass
+                except Exception as ue:
+                    self._warn(environ, f"update_run failed: {ue}")
             raise
         finally:
             if hasattr(iterable, "close"):
@@ -191,10 +191,17 @@ class LangSmithMCPMiddleware:
                     error=error,
                     end_time=end_time,
                 )
-            except Exception:
-                pass
+            except Exception as exc:
+                self._warn(environ, f"update_run failed: {exc}")
 
         return [full_body]
+
+    @staticmethod
+    def _warn(environ: dict, msg: str) -> None:
+        try:
+            environ["wsgi.errors"].write(f"dash-langsmith: {msg}\n")
+        except Exception:
+            pass
 
     @staticmethod
     def _session_id(environ: dict) -> str:
