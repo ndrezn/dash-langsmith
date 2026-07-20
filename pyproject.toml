@@ -6,11 +6,16 @@ build-backend = "setuptools.build_meta"
 name = "dash-langsmith"
 version = "0.2.0"
 description = "Automatic LangSmith tracing for Dash MCP tool calls"
+readme = "README.md"
 requires-python = ">=3.9"
 dependencies = [
     "dash>=3.0.0",
     "langsmith>=0.1.0",
 ]
+
+[project.urls]
+Homepage = "https://github.com/ndrezn/dash-langsmith"
+Repository = "https://github.com/ndrezn/dash-langsmith"
 
 [project.entry-points."dash_hooks"]
 dash_langsmith = "dash_langsmith"
